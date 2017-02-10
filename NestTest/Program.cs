@@ -1,37 +1,48 @@
 ﻿using Nest;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace NestTest
 {
     class Program
     {
-        static ElasticClient client;
-        const string Index = "nesttest";
+        static ElasticClient _client;
+        const string Index = "importrecords";
         static void Main(string[] args)
         {
             var node = new Uri("http://192.168.210.36:9200/");
             var settings = new ConnectionSettings(
                 node
             );
-            client = new ElasticClient(settings);
+
+            settings.Proxy(new Uri("http://127.0.0.1:8888"), "", "");
+            _client = new ElasticClient(settings);
             //CreateIndex();
-            // Insert();
+            //Insert();
 
 
-            client.Search<Person>(s => s
-    .Index(Index)
-    .Query(q => q.QueryString(qs => qs.Query("bo").DefaultOperator(Operator.And))));
+            var result = _client.Search<Media.Net.Entity.EPaperInEsEntity>(s => s
+                .Index(Index)
+                .Type("data")
+                .Take(10000)
+                //.Query(q => q.QueryString(qs => qs.Query("文舟琬胤海修").Fields("Author").DefaultOperator(Operator.And)))
+                .Query(q => q.MatchPhrase(mq => mq.Field("Title").Query("大 众  全国").Slop(1)))
 
+            );
+            Debug.Flush();
+            Debug.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject("用时:" + result.Took + "ms"));
+            foreach (var entity in result.Documents)
+            {
+                Debug.WriteLine( entity.Title);
+                //Debug.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(entity));
+            }
         }
 
-        static void CreateIndex()
+        private static void CreateIndex()
         {
 
-            var exists = client.IndexExists(Index);
+            var exists = _client.IndexExists(Index);
 
             //基本配置  
             IIndexState indexState = new IndexState()
@@ -43,7 +54,7 @@ namespace NestTest
                 }
             };
             if (!exists.Exists)
-                client.CreateIndex(Index, p => p
+                _client.CreateIndex(Index, p => p
         .InitializeUsing(indexState)
         .Mappings(ms =>
             ms.Map<Person>(m =>
@@ -54,7 +65,7 @@ namespace NestTest
                 ;
         }
 
-        static void Insert()
+        private static void Insert()
         {
             IEnumerable<Person> persons = new List<Person>
 {
@@ -63,35 +74,35 @@ namespace NestTest
         Id = 1,
         Firstname = "Boterhuis-040",
         Lastname = "Gusto-040",
-        Chains = new string[]{ "a","b","c" },
+        Chains = new[]{ "a","b","c" },
     },
     new Person()
     {
         Id = 2,
         Firstname = "sales@historichousehotels.com",
         Lastname = "t Boterhuis 1",
-        Chains = new string[]{ "a","c" },
+        Chains = new[]{ "a","c" },
     },
     new Person()
     {
         Id = 3,
         Firstname = "Aberdeen #110",
         Lastname = "sales@historichousehotels.com",
-        Chains = new string[]{ "b","c" },
+        Chains = new[]{ "b","c" },
     },
     new Person()
     {
         Id = 4,
         Firstname = "Aberdeen #110",
         Lastname = "t Boterhuis 2",
-        Chains = new string[]{ "a","b" },
+        Chains = new[]{ "a","b" },
     },
 };
 
             foreach (var person in persons)
             {
                 var request = new IndexRequest<Person>(person, Index);
-                client.Index(request);
+                _client.Index(request);
             }
         }
 
